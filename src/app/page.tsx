@@ -1,65 +1,103 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import React from "react";
+import { UploadDropzone } from "@/components/UploadDropzone";
+import { MediaGallery } from "@/components/MediaGallery";
+import type { LocalUpload, MediaObject } from "@/types/media";
+
+export default function HomePage() {
+  const [uploads, setUploads] = React.useState<LocalUpload[]>([]);
+  const [items, setItems] = React.useState<MediaObject[]>([]);
+  const [loadingList, setLoadingList] = React.useState(false);
+
+  const refreshList = React.useCallback(async () => {
+    setLoadingList(true);
+    try {
+      const res = await fetch("/api/media/list", { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to fetch media list");
+      const data = (await res.json()) as { items: MediaObject[] };
+      setItems(data.items);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingList(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    refreshList();
+  }, [refreshList]);
+
+  React.useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ key: string; progress: number }>)
+          .detail;
+      setUploads((prev) =>
+          prev.map((u) =>
+              u.key === detail.key ? { ...u, progress: detail.progress } : u
+          )
+      );
+    };
+    window.addEventListener("upload-progress", handler as EventListener);
+    return () => {
+      window.removeEventListener("upload-progress", handler as EventListener);
+    };
+  }, []);
+
+  const handleOptimisticAdd = (upload: LocalUpload) => {
+    setUploads((prev) => [...prev, upload]);
+  };
+
+  const handleUploadSuccess = (key: string) => {
+    setUploads((prev) =>
+        prev.map((u) =>
+            u.key === key ? { ...u, status: "success", progress: 100 } : u
+        )
+    );
+    setTimeout(() => {
+      refreshList();
+      setUploads((prev) => prev.filter((u) => u.key !== key));
+    }, 800);
+  };
+
+  const handleUploadError = (key: string, error: string) => {
+    setUploads((prev) =>
+        prev.map((u) =>
+            u.key === key ? { ...u, status: "error", error } : u
+        )
+    );
+  };
+
+  const handleDelete = async (key: string) => {
+    const confirmed = confirm("Delete this file?");
+    if (!confirmed) return;
+    try {
+      const res = await fetch("/api/media/delete", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key }),
+      });
+      if (!res.ok) throw new Error("Failed to delete");
+      setItems((prev) => prev.filter((i) => i.key !== key));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete file");
+    }
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+      <main>
+        <UploadDropzone
+            onOptimisticAdd={handleOptimisticAdd}
+            onUploadSuccess={handleUploadSuccess}
+            onUploadError={handleUploadError}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+
+        <div className="mt-4 text-xs text-slate-400">
+          {loadingList ? "Refreshing media list…" : "\u00A0"}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+
+        <MediaGallery items={items} uploads={uploads} onDelete={handleDelete} />
       </main>
-    </div>
   );
 }

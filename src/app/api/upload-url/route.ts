@@ -30,7 +30,6 @@ export async function POST(req: NextRequest) {
             Bucket: MEDIA_BUCKET,
             Key: key,
             ContentType: body.fileType,
-            ACL: "public-read",
         });
 
         const uploadUrl = await getSignedUrl(s3Client, command, {
