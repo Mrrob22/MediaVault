@@ -14,10 +14,6 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
                                                               uploads,
                                                               onDelete,
                                                           }) => {
-    const allItems = [
-        ...uploads,
-    ];
-
     return (
         <section className="mt-6">
             <div className="mb-3 flex items-center justify-between">
