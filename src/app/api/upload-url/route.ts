@@ -22,7 +22,6 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const ext = body.fileName.split(".").pop();
         const safeName = body.fileName.replace(/[^\w.\-]/g, "_");
         const key = `${Date.now()}-${safeName}`;
 
